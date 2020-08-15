@@ -1,0 +1,84 @@
+---
+title: "PMLCourseProject"
+author: "shuhao"
+date: "2020/8/14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction
+This document is for coursera course project. It was established in Rstudio and would be converted into HTML format. Both the md file and html will be uploaded in my github repo.
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+I am going to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner which they didi the exercise.The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+## Getting, cleanning data and doing some exploratory analysis.
+
+```{r }
+data_train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+data_test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+dim(data_train)
+
+
+#  we found that there are many NA. 1 remove the near zero variables 2 remove NA.
+library(caret)
+rm <- nearZeroVar(data_train)
+data_train<- data_train[,-rm]
+
+rm1 <- sapply(data_train, function(x) mean(is.na(x)) >0.8)
+data_train<- data_train[,rm1==FALSE]
+
+
+# remove the variables that have little influence
+data_train<- data_train[,-c(1:7)]
+
+# split the data into two parts,one 75% for training adn the rest for testing
+set.seed(100)
+inTrain <- createDataPartition(data_train$classe, p =0.75,list=FALSE)
+trainingdata<- data_train[inTrain,]
+testingdata<- data_train[-inTrain,]
+dim(trainingdata)
+dim(testingdata)
+
+```
+
+## Building models through random forests, gbm methods
+
+### Prediction with random forests
+```{r }
+library(randomForest)
+fitcontrol = trainControl(method="repeatedcv",number=5,verboseIter = FALSE)
+model1 <-train(classe~., data=trainingdata,method="rf",trControl= fitcontrol)
+
+model1$finalModel
+# prediction on test data
+predict1 <- predict(model1,newdata= testingdata)
+#  evaluate model1
+result1 <- confusionMatrix(predict1,as.factor(testingdata$classe))
+result1
+```
+
+### the result shows that the accuracy rate is 0.9947 therefore, the out-of-sample-errror is about 0.0053.
+
+### prediction with gbm
+```{r }
+library(gbm)
+
+fitcontrol2 <-trainControl(method="repeatedcv",number=5,repeats =1)
+model2 <- train(classe~.,data=trainingdata,method="gbm", trControl=fitcontrol2,verbose=FALSE)
+model2$finalModel
+model2
+# prediction on test data
+predict2 <- predict(model2,newdata= testingdata)
+#  evaluate model2
+result2 <- confusionMatrix(predict2,as.factor(testingdata$classe))
+result2
+```
+### the result shows the accuracy rate is 0.9619 so the out of sample error is 0.0381. Compared with random forests, I choose the first model with random forests method.
+
+## Applying the rf model to the data_test
+```{r }
+results_20 <- predict(model1, newdata= data_test)
+results_20
+```
